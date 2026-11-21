@@ -1,0 +1,11 @@
+{
+  "requestId": "4e5d7c13-7a53-4adf-a395-411a29e98e29",
+  "customer": {
+    "name": "Cliente Exemplo",
+    "whatsapp": "85000000001",
+    "city": "Fortaleza",
+    "uf": "CE",
+    "document": ""
+  },
+  "items": [{ "productId": "camiseta-basica", "variantId": "camiseta-preta-m", "qty": 2 }]
+}

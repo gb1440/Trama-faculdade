@@ -1,0 +1,23 @@
+{
+  "order": {
+    "id": "b1dc0cf2-efd9-45c9-a9f3-905876d54708",
+    "number": 1001,
+    "status": "Novo",
+    "total_qty": 2,
+    "total": 11980,
+    "items": [
+      {
+        "productId": "camiseta-basica",
+        "variantId": "camiseta-preta-m",
+        "name": "Camiseta básica",
+        "color": "Preta",
+        "size": "M",
+        "qty": 2,
+        "unitPrice": 5990,
+        "total": 11980
+      }
+    ]
+  },
+  "message": "Pedido #1001 recebido",
+  "whatsappUrl": "https://wa.me/5585000000000"
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "eventId": "b261a1e1-81d0-4ae7-808c-f25d64a146fb",
+    "type": "estoque.atualizado",
+    "schemaVersion": 1,
+    "entityVersion": 1,
+    "catalogSlug": "loja-escola",
+    "occurredAt": "2026-11-20T12:00:00Z",
+    "data": { "productId": "camiseta-basica", "variantId": "camiseta-preta-m", "stock": 8 }
+  },
+  {
+    "eventId": "0697f27c-d201-426d-abb8-e2bb8235d388",
+    "type": "pedido.status_alterado",
+    "schemaVersion": 1,
+    "entityVersion": 1,
+    "catalogSlug": "loja-escola",
+    "occurredAt": "2026-11-20T12:05:00Z",
+    "data": { "orderId": "b1dc0cf2-efd9-45c9-a9f3-905876d54708", "status": "Em atendimento" }
+  }
+]

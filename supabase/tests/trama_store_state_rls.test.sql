@@ -1,0 +1,13 @@
+begin;
+select plan(4);
+select tests.create_supabase_user('owner_a');
+select tests.create_supabase_user('owner_b');
+select tests.authenticate_as('owner_a');
+insert into public.trama_store_state(user_id, state) values (tests.get_supabase_uid('owner_a'), '{}'::jsonb);
+select results_eq($$ select count(*)::bigint from public.trama_store_state $$, array[1::bigint], 'owner reads their store');
+select lives_ok($$ update public.trama_store_state set revision = 1 where user_id = tests.get_supabase_uid('owner_a') $$, 'owner updates their store');
+select tests.authenticate_as('owner_b');
+select results_eq($$ select count(*)::bigint from public.trama_store_state $$, array[0::bigint], 'another user cannot read the store');
+select throws_ok($$ insert into public.trama_store_state(user_id, state) values (tests.get_supabase_uid('owner_a'), '{}'::jsonb) $$, '42501', null, 'another user cannot write as the owner');
+select * from finish();
+rollback;

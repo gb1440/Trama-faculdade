@@ -1,0 +1,16 @@
+name: trama-faculdade
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: trama_local
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Execute npm run demo:acesso e carregue .env.demo}
+    ports:
+      - "127.0.0.1:55672:5672"
+      - "127.0.0.1:15673:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq-data:

@@ -1,0 +1,29 @@
+{
+  "catalog": {
+    "slug": "loja-escola",
+    "store_name": "Loja Escola",
+    "logo": "",
+    "city": "Fortaleza / CE",
+    "title": "Catálogo online",
+    "description": "",
+    "price_mode": "Varejo",
+    "minimum_qty": 0,
+    "minimum_value": 0,
+    "updated_at": "2026-11-20T12:00:00Z",
+    "products": [
+      {
+        "id": "camiseta-basica",
+        "name": "Camiseta básica",
+        "code": "TRM-000001",
+        "category": "Camisetas",
+        "photo": "",
+        "price": 5990,
+        "minimum": 0,
+        "variants": [
+          { "id": "camiseta-preta-m", "color": "Preta", "size": "M", "stock": 10 },
+          { "id": "camiseta-preta-g", "color": "Preta", "size": "G", "stock": 5 }
+        ]
+      }
+    ]
+  }
+}
