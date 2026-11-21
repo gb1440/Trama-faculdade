@@ -90,7 +90,7 @@ Em terminais separados, rodem `npm run mensageria:publicar` e `npm run mensageri
 
 Para ensaiar, criem um pedido e aguardem o processamento de `Novo`. Parem o consumidor com Ctrl+C e alterem o status no Trama para **Em atendimento**. Mostrem a mensagem aguardando em `trama.site` e o status antigo na consulta do site. Reiniciem o consumidor e repitam o GET para mostrar o novo status.
 
-`npm run test:integracao` automatiza esse fluxo usando Supabase, RabbitMQ e Trama locais. Parem os dois workers manuais antes do teste, pois ele controla os próprios processos. O teste usa o estoque da Loja Escola, cria um pedido e depois o cancela para repor as unidades.
+`npm run test:integracao` automatiza esse fluxo usando Supabase, RabbitMQ e Trama locais. Parem os dois workers manuais antes do teste, pois ele controla os próprios processos. Se o Trama estiver em outra porta, definam `TRAMA_TEST_URL` com o endereço local, por exemplo, `$env:TRAMA_TEST_URL = 'http://127.0.0.1:3300'` no PowerShell. O teste cria um pedido na Loja Escola e depois o cancela para repor as unidades.
 
 ## 5. Começar o CSV
 

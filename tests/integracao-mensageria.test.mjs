@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { setTimeout as wait } from 'node:timers/promises';
 import amqp from 'amqplib';
 
-const trama = 'http://127.0.0.1:3000';
+const trama = new URL(process.env.TRAMA_TEST_URL ?? 'http://127.0.0.1:3000').origin;
 const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const apiKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const jsonHeaders = { 'Content-Type': 'application/json' };
@@ -37,6 +37,7 @@ async function stopWorker(worker) {
 }
 
 test('pedido idempotente, acompanhamento privado e atualização pela fila após pausa', { timeout: 45000 }, async t => {
+  assert.match(trama, /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/, 'Use o endereço local do Trama acadêmico');
   assert.match(supabase ?? '', /^http:\/\/(127\.0\.0\.1|localhost):55421$/);
   const db = new URL(process.env.TRAMA_DATABASE_URL);
   assert.ok(['127.0.0.1', 'localhost'].includes(db.hostname) && db.port === '55422', 'Use o banco acadêmico local');
