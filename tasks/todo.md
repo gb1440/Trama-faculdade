@@ -2,9 +2,10 @@
 
 ## API e mensageria · `feat/api-mensageria`
 
-- [ ] Validar catálogo e pedido com o site. Conferir estoque, pedido repetido e quantidade indisponível. Testar também a repetição de um pedido que esgotou a variação, pois a rota valida o estoque atual antes de chegar à deduplicação no banco.
-- [ ] Combinar com a frente de acompanhamento o contrato de consulta do próprio pedido, incluindo como comprovar o acesso e quais estados exibir.
-- [ ] Publicar e consumir eventos do RabbitMQ. Demonstrar que a mudança já está gravada quando o evento é publicado, que a pausa e a retomada do consumidor funcionam e que mensagens repetidas não causam efeitos duplicados.
+- [x] Validar o pedido pela API, incluindo estoque insuficiente, repetição após esgotar a variação e conflito de identificador.
+- [x] Expor a consulta do próprio pedido com token e documentar as rotas para o site.
+- [x] Publicar e consumir eventos do RabbitMQ. Validar pausa, retomada e reentrega de evento antigo no ambiente acadêmico local.
+- [ ] Ensaiar o fluxo pela interface do novo site junto com as outras frentes.
 
 ## Site e carrinho · `feat/site-ecommerce`
 

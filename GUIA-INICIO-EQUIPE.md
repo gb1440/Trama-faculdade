@@ -53,11 +53,27 @@ curl.exe http://127.0.0.1:3000/api/catalog/loja-escola/orders -H 'Content-Type: 
 
 O GET retorna `catalog.products`, com `id` do produto, `id` da variação, estoque e preço em centavos. Para o POST, usem `productId` e `variantId` do GET, `qty`, `requestId` em UUID e dados do cliente. Nome, WhatsApp com DDD, cidade e UF são obrigatórios, e o documento é opcional.
 
-O primeiro pedido do exemplo reserva 2 unidades M. O próximo GET deve mostrar 8. Repetir esse mesmo pedido com o mesmo `requestId` preserva a reserva e o número. Para um pedido novo, gerem outro UUID. A resposta de sucesso traz `order`, `message` e `whatsappUrl`. As falhas trazem `error`. O link de WhatsApp dos dados fictícios serve só para testar a exibição.
+O primeiro pedido do exemplo reserva 2 unidades M. O próximo GET deve mostrar 8. Repetir o mesmo carrinho e cliente com o mesmo `requestId` devolve o pedido original, mesmo se a variação esgotou. Usar o mesmo identificador com dados diferentes devolve `409`. Para cada pedido novo, gerem um UUID aleatório com `crypto.randomUUID()`. A resposta traz `order`, `message` e `whatsappUrl`. O link dos dados fictícios serve para testar a exibição.
 
-O site da equipe fica em `site/` como projeto separado. Ao trocar os exemplos por chamadas reais, façam as chamadas pelo servidor do site ou por um proxy de desenvolvimento. O contrato atual não oferece consulta pública de status. As frentes de API e acompanhamento vão acertar esse contrato.
+O site da equipe fica em `site/` como projeto separado. Façam as chamadas pelo servidor do site ou por um proxy de desenvolvimento. Depois do POST, guardem `order.id` e o `requestId` enviado junto ao pedido.
 
-## 4. Começar a mensageria
+| Rota | Uso pelo site |
+|---|---|
+| `GET /api/catalog/{slug}/orders/{orderId}` | Enviar `Authorization: Bearer <requestId>`. Retorna `{ order: { id, number, status, updatedAt } }`. Sem token válido, responde `401`. Quando o pedido e o token não correspondem, responde `404`. |
+| `GET /api/catalog/{slug}/stock` | Retorna `{ updates: [{ productId, variantId, stock, entityVersion }] }` com os últimos saldos processados pela fila. O GET de catálogo fornece o carregamento inicial e a disponibilidade atual para compra. |
+
+O `requestId` dá acesso à consulta daquele pedido. Guardem-no na sessão do cliente ou no servidor do site, sem colocar o valor na URL. O status consultado reflete o que o consumidor já processou e pode ficar temporariamente atrás do painel. Para testar os endpoints em PowerShell:
+
+```powershell
+$pedido = Get-Content exemplos/pedido.json -Raw | ConvertFrom-Json
+$pedido.requestId = [guid]::NewGuid().ToString()
+$criado = Invoke-RestMethod http://127.0.0.1:3000/api/catalog/loja-escola/orders -Method Post -ContentType 'application/json' -Body ($pedido | ConvertTo-Json -Depth 5)
+Invoke-RestMethod "http://127.0.0.1:3000/api/catalog/loja-escola/orders/$($criado.order.id)" -Headers @{ Authorization = "Bearer $($pedido.requestId)" }
+```
+
+## 4. Rodar a mensageria
+
+Se o banco já estava rodando antes desta atualização, apliquem a migração local com `npx --yes supabase@2.121.0 migration up --local`. Em `.env.demo`, acrescentem `TRAMA_DATABASE_URL` com o valor de `DB_URL` mostrado por `npx --yes supabase@2.121.0 status -o env`. Essa URL contém a credencial do banco local e é usada apenas pelos workers.
 
 ```powershell
 docker compose --env-file .env.demo up -d rabbitmq
@@ -66,7 +82,15 @@ docker compose --env-file .env.demo exec -T rabbitmq rabbitmq-diagnostics -q pin
 
 A interface de administração fica em `http://127.0.0.1:15673`. O usuário do broker é `trama_local` e a senha está em `RABBITMQ_PASSWORD` no `.env.demo`. A conexão AMQP fica em `127.0.0.1:55672`. `docker compose --env-file .env.demo stop rabbitmq` encerra o broker.
 
-O exemplo `eventos.json` contém uma proposta para estoque atualizado e status alterado. O Trama hoje usa `Novo`, `Em atendimento`, `Finalizado` e `Cancelado`. A frente de mensageria vai implementar publicação e consumo. A frente de acompanhamento pode simular a transição com o exemplo.
+Em terminais separados, rodem `npm run mensageria:publicar` e `npm run mensageria:consumir`.
+
+- Quando estoque ou status muda, a mesma transação registra um evento pendente no Supabase. O publicador só marca o evento como enviado depois da confirmação do RabbitMQ.
+- A fila durável é `trama.site`. O consumidor grava o estado para consulta do site antes de confirmar a entrega. Só aplica uma versão posterior à atual. Mensagens inválidas seguem para `trama.site.invalidos`.
+- `exemplos/eventos.json` mostra os tipos `estoque.atualizado` e `pedido.status_alterado`. Os estados do pedido são `Novo`, `Em atendimento`, `Finalizado` e `Cancelado`.
+
+Para ensaiar, criem um pedido e aguardem o processamento de `Novo`. Parem o consumidor com Ctrl+C e alterem o status no Trama para **Em atendimento**. Mostrem a mensagem aguardando em `trama.site` e o status antigo na consulta do site. Reiniciem o consumidor e repitam o GET para mostrar o novo status.
+
+`npm run test:integracao` automatiza esse fluxo usando Supabase, RabbitMQ e Trama locais. Parem os dois workers manuais antes do teste, pois ele controla os próprios processos. O teste usa o estoque da Loja Escola, cria um pedido e depois o cancela para repor as unidades.
 
 ## 5. Começar o CSV
 

@@ -23,7 +23,7 @@ O [guia de início da equipe](GUIA-INICIO-EQUIPE.md) tem os passos para clonar, 
 
 1. Usar exemplos comuns de produto, variação, pedido, mensagem e CSV. O [guia de início da equipe](GUIA-INICIO-EQUIPE.md) documenta o contrato encontrado no código e marca os pontos ainda propostos.
 2. Conectar o site à API existente. `GET /api/catalog/{slug}` entrega os produtos e `POST /api/catalog/{slug}/orders` recebe o pedido. A frente de API mantém o ambiente de teste e a consulta de status. O site pode começar com respostas simuladas.
-3. Publicar atualizações de estoque e status depois que o Trama registrar a mudança. O consumidor aplica o evento no ambiente acadêmico do site e confirma o processamento. A fila e o consumidor serão construídos nesta frente.
+3. Iniciar publicador e consumidor para levar mudanças de estoque e status ao RabbitMQ. O site consulta o estado processado pelos endpoints de acompanhamento e estoque.
 4. O site exporta o CSV de produtos no formato acordado com a frente de arquivos. Essa frente demonstra a importação e a conferência dos registros no Trama. O relatório reaproveita a exportação do painel e é conferido em uma planilha.
 
 ## Demonstração para a entrega

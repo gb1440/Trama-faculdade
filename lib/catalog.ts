@@ -9,6 +9,9 @@ export type CatalogOrder={customer:CatalogCustomer;items:CatalogLine[];totalQty:
 export type CatalogForValidation={storeName:string;minimumQty:number;minimumValue:number;products:CatalogProduct[]};
 
 const text=(value:unknown,max:number)=>typeof value==='string'?value.trim().slice(0,max):'';
+export function isOrderUuid(value: unknown): value is string {
+  return typeof value === 'string' && /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(value);
+}
 const integer=(value:unknown,min:number,max:number)=>{const number=Number(value);if(!Number.isSafeInteger(number)||number<min||number>max)throw new Error('Informe uma quantidade válida.');return number};
 export function normalizeCatalogSlug(value:string){return value.normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase('pt-BR').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,60).replace(/-+$/,'')}
 export function normalizeCatalogLogo(value:unknown){const logo=text(value,2000);if(!logo)return'';if(/^https:\/\/[^\s]+$/i.test(logo)||/^storage:product-images\/[0-9a-f-]{36}\/catalog-logos\/[0-9a-f-]{36}\.(jpg|png|webp|avif)$/i.test(logo))return logo;throw new Error('A referência da logo é inválida.')}
@@ -22,14 +25,20 @@ export function buildCatalogProducts(state:State,mode:CatalogPriceMode):CatalogP
  })).filter(product=>product.variants.length>0);
 }
 
-export function validateCatalogOrder(catalog:CatalogForValidation,input:unknown):CatalogOrder{
- if(!input||typeof input!=='object')throw new Error('Pedido inválido.');
- const raw=input as Record<string,unknown>,rawCustomer=(raw.customer||{}) as Record<string,unknown>;
+export function validateCatalogCustomer(input: unknown): CatalogCustomer {
+ const rawCustomer=(input||{}) as Record<string,unknown>;
  const customer:CatalogCustomer={name:text(rawCustomer.name,120),whatsapp:text(rawCustomer.whatsapp,30).replace(/\D/g,''),city:text(rawCustomer.city,100),uf:text(rawCustomer.uf,2).toLocaleUpperCase('pt-BR'),document:text(rawCustomer.document,30).replace(/\D/g,'')};
  if(!customer.name)throw new Error('Informe o nome do cliente.');
  if(customer.whatsapp.length<10||customer.whatsapp.length>13)throw new Error('Informe um WhatsApp válido com DDD.');
  if(!customer.city||!/^[A-Z]{2}$/.test(customer.uf))throw new Error('Informe cidade e UF.');
  if(customer.document&&![11,14].includes(customer.document.length))throw new Error('Informe um CPF ou CNPJ válido.');
+ return customer;
+}
+
+export function validateCatalogOrder(catalog:CatalogForValidation,input:unknown):CatalogOrder{
+ if(!input||typeof input!=='object')throw new Error('Pedido inválido.');
+ const raw=input as Record<string,unknown>;
+ const customer=validateCatalogCustomer(raw.customer);
  if(!Array.isArray(raw.items)||!raw.items.length||raw.items.length>200)throw new Error('Adicione pelo menos uma peça ao pedido.');
  const seen=new Set<string>(),perProduct=new Map<string,number>();
  const items:CatalogLine[]=raw.items.map(value=>{

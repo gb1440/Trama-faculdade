@@ -4,8 +4,8 @@ O Trama é o sistema de gestão. O novo site é um projeto separado, com código
 
 ## Contratos de partida
 
-- **API.** Usar as rotas de catálogo e pedidos existentes. O site deve chamar o Trama pelo seu servidor ou por um proxy de desenvolvimento, mantendo URLs configuráveis. O acompanhamento público e a forma de autenticar a consulta de status ficam a cargo das frentes de API e acompanhamento. O site só precisa receber o identificador e o status do próprio pedido.
-- **Mensageria.** O Trama publica a mudança depois de gravá-la. O consumidor roda no servidor do site ou em um processo separado e atualiza a informação que o site apresenta. O arquivo `exemplos/eventos.json` é a proposta inicial. Confirmar com a frente de mensageria o destino, a versão e o tratamento de duplicatas antes de conectar.
+- **API.** O site chama o Trama pelo seu servidor ou por um proxy de desenvolvimento. Para consultar o pedido, usa o ID retornado e o `requestId` no cabeçalho de autorização. A resposta de acompanhamento traz só ID, número, status e data da última atualização processada.
+- **Mensageria.** A transação registra o evento pendente. Dois workers publicam na fila `trama.site` e consomem para atualizar as consultas do site. O consumidor ignora versões antigas ou repetidas. O arquivo `exemplos/eventos.json` descreve os dois eventos.
 - **CSV.** O site exporta o arquivo e o Trama importa. Código externo, cor e tamanho identificam a linha. As frentes de arquivos e API definem onde guardar o vínculo com os IDs internos. Depois da carga inicial, os ajustes seguem as regras do estoque do Trama. O relatório do painel segue do Trama para a planilha.
 
 ## Ordem de integração
