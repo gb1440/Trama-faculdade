@@ -5,9 +5,10 @@ import {Dialog,DialogContent,DialogTitle,DialogDescription} from '@/components/u
 import {AlertDialog,AlertDialogContent,AlertDialogTitle,AlertDialogDescription} from '@/components/ui/alert-dialog';
 import {Select,SelectTrigger,SelectValue,SelectContent,SelectItem} from '@/components/ui/select';
 import {SidebarProvider,Sidebar,SidebarContent,SidebarHeader,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton} from '@/components/ui/sidebar';
-import {type State,type Sale,type Entry,today,parseColorList,parseSizeList,cashExpected,monthlyReport} from '@/lib/domain';
+import {type State,type Sale,type Entry,type CsvImportSummary,today,parseColorList,parseSizeList,cashExpected,monthlyReport} from '@/lib/domain';
 import {supabase} from '@/lib/supabase-browser';
 import CatalogManager from '@/app/catalog-manager';
+import CsvImportDialog from '@/app/csv-import-dialog';
 const plural=(n:number,one:string,many:string)=>`${n} ${n===1?one:many}`;
 const money=(n:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(n/100);
 const shortDate=(s:string)=>s?s.split('-').reverse().join('/'):'—';
@@ -32,6 +33,58 @@ export default function StoreApp(){
  function go(p:string){setPage(p);setQuery('');setFilter('Todos')}
  function open(type:string,record?:any){setError('');setModal({type,record})}
  async function save(action:Record<string,unknown>,close=true):Promise<State|false>{if(busy||!accessToken)return false;setBusy(true);setError('');try{const r=await fetch('/api/store',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${accessToken}`},body:JSON.stringify({...action,revision})}),b=await r.json() as {state:State;revision:number;local?:boolean;error:string};if(!r.ok){if(r.status===409)await refresh();if(r.status===401)await supabase.auth.signOut();throw Error(b.error)}setData(b.state);setRevision(b.revision);if(close)setModal(null);setNotice('Tudo certo. Alterações salvas.');return b.state}catch(e){setError(e instanceof Error?e.message:'Não foi possível salvar.');return false}finally{setBusy(false)}}
+
+ async function importCsv(csv: string): Promise<CsvImportSummary> {
+   if (busy || !accessToken) {
+     throw new Error('Aguarde ou entre novamente na sua conta.');
+   }
+
+   setBusy(true);
+   setError('');
+
+   try {
+     const response = await fetch('/api/store', {
+       method: 'POST',
+       headers: {
+         'Content-Type': 'application/json',
+         Authorization: `Bearer ${accessToken}`
+       },
+       body: JSON.stringify({
+         action: 'import-products-csv',
+         csv,
+         revision
+       })
+     });
+
+     const body = await response.json() as {
+       state: State;
+       revision: number;
+       importSummary?: CsvImportSummary;
+       error?: string;
+     };
+
+     if (!response.ok) {
+       if (response.status === 409) await refresh();
+       if (response.status === 401) await supabase.auth.signOut();
+
+       throw new Error(
+         body.error || 'Não foi possível importar o CSV.'
+       );
+     }
+
+     if (!body.importSummary) {
+       throw new Error('Resposta de importação inválida.');
+     }
+
+     setData(body.state);
+     setRevision(body.revision);
+
+     return body.importSummary;
+   } finally {
+     setBusy(false);
+   }
+ }
+
  if(!authReady)return <div className="auth-shell"><div className="auth-card"><span className="brand auth-brand"><span className="brand-mark">t</span>trama<span className="brand-dot">.</span></span><p>Abrindo sua loja…</p></div></div>;
  if(!accessToken)return <AuthScreen/>;
  const s=data,confirmed=s?.sales.filter(x=>x.status==='Confirmada')||[],month=today().slice(0,7),currentReport=s?monthlyReport(s,month):null,entries=s?.entries.filter(e=>!e.void)||[],pending=entries.filter(e=>e.paid<e.amount),incoming=pending.filter(e=>e.direction==='in').reduce((n,e)=>n+e.amount-e.paid,0),outgoing=pending.filter(e=>e.direction==='out').reduce((n,e)=>n+e.amount-e.paid,0),balance=s?.receipts.reduce((n,r)=>n+(r.direction==='in'?r.amount:-r.amount),0)||0,low=s?.products.flatMap(p=>p.variants.filter(v=>v.stock<=p.minimum).map(v=>({p,v})))||[],followups=s?.customers.filter(c=>c.followup&&c.followup<=today())||[];
@@ -41,7 +94,7 @@ export default function StoreApp(){
  function salesList(list:Sale[]){return <div className="rows">{list.map(sale=><button className="sale-row" key={sale.id} onClick={()=>open('sale-detail',sale)}><span className="row-icon"><ShoppingBag size={19}/></span><span className="row-main"><strong>{sale.customer}</strong><small>#{String(sale.number).padStart(4,'0')} · {shortDate(sale.date)} · {sale.type}</small></span><Badge tone={sale.status==='Confirmada'?'green':sale.status==='Cancelada'?'neutral':'amber'}>{sale.status}</Badge><strong>{money(sale.total)}</strong><ChevronRight size={17}/></button>)}</div>}
  return <SidebarProvider><Sidebar className="desktop-nav"><SidebarHeader><a className="brand" href="/" aria-label="Trama início"><span className="brand-mark">t</span>trama<span className="brand-dot">.</span></a><div className="shop-switch"><span className="shop-avatar"><Store size={19}/></span><span><strong>{s?.settings.name||'Minha loja'}</strong><small>Atacado & varejo</small></span></div></SidebarHeader><SidebarContent><div className="nav-caption">DIA A DIA</div><SidebarMenu>{nav.map(({name,icon:Icon})=><SidebarMenuItem key={name}><SidebarMenuButton className={'nav-item '+(page===name?'active':'')} onClick={()=>go(name)}><Icon size={20}/><span>{name}</span>{name==='Clientes'&&followups.length>0&&<b>{followups.length}</b>}</SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu></SidebarContent><SidebarFooter><div className="side-note"><span className="status-dot"/> Atendimento manual<p>Os detalhes fazem a diferença.<br/>Mantenha seus clientes por perto.</p></div><button className="nav-item" onClick={()=>open('settings')}><Settings size={19}/> Minha loja</button></SidebarFooter></Sidebar>
  <div className="workspace"><header className="topbar"><div className="breadcrumb"><span>Minha loja</span><ChevronRight size={14}/><strong>{page}</strong></div><div className="top-actions"><span className="date-label"><CalendarDays size={16}/>{shortDate(today())}</span><button aria-label="Atualizar dados" className="icon-button" onClick={()=>refresh()}><RefreshCw size={17}/></button><button className="avatar" onClick={()=>open('settings')} aria-label="Configurar loja">{(s?.settings.name||'ML').slice(0,2).toUpperCase()}</button></div></header>
- <main><div className="page-heading"><div><div className="eyebrow">{page==='Início'?'TUDO NO SEU LUGAR':'SUA LOJA, MAIS SIMPLES'}</div><h1>{page==='Início'?'Vamos cuidar da sua loja?':page==='Estoque'?'Produtos e estoque':page}</h1><p>{({'Início':'Um olhar para hoje. Um passo para a próxima venda.','Vendas':'Do primeiro pedido ao pagamento, tudo por aqui.','Estoque':'Cada cor, cada tamanho, cada peça.','Catálogo':'Compartilhe suas peças disponíveis e receba pedidos online.','Clientes':'Lembre de quem compra com você.','Financeiro':'Caixa, contas, compras e resultados em um só lugar.'} as Record<string,string>)[page]}</p></div>{pageAction&&<button className="primary page-primary-action" onClick={()=>open(pageAction.modal)} disabled={!s}><Plus size={19}/>{pageAction.label}</button>}</div>
+ <main><div className="page-heading"><div><div className="eyebrow">{page==='Início'?'TUDO NO SEU LUGAR':'SUA LOJA, MAIS SIMPLES'}</div><h1>{page==='Início'?'Vamos cuidar da sua loja?':page==='Estoque'?'Produtos e estoque':page}</h1><p>{({'Início':'Um olhar para hoje. Um passo para a próxima venda.','Vendas':'Do primeiro pedido ao pagamento, tudo por aqui.','Estoque':'Cada cor, cada tamanho, cada peça.','Catálogo':'Compartilhe suas peças disponíveis e receba pedidos online.','Clientes':'Lembre de quem compra com você.','Financeiro':'Caixa, contas, compras e resultados em um só lugar.'} as Record<string,string>)[page]}</p></div>{pageAction&&(page==='Estoque'?<div className="flex flex-wrap items-center justify-end gap-2"><CsvImportDialog disabled={!s||busy} onImport={importCsv}/><button className="primary page-primary-action" onClick={()=>open(pageAction.modal)} disabled={!s}><Plus size={19}/>{pageAction.label}</button></div>:<button className="primary page-primary-action" onClick={()=>open(pageAction.modal)} disabled={!s}><Plus size={19}/>{pageAction.label}</button>)}</div>
  {local&&<div className="local-note">Prévia local conectada ao Supabase.</div>}
  {error&&!modal&&!cancel&&!remove&&<div className="error" role="alert"><AlertCircle size={18}/>{error}<button onClick={()=>refresh()}>Tentar novamente</button></div>}
  {!s?<div className="loading" role="status">{error?'Aguardando conexão com a loja.':'Abrindo sua loja…'}</div>:<>

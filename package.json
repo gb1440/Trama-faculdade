@@ -15,7 +15,7 @@
     "test:integracao": "node --env-file=.env.local --env-file=.env.demo --test tests/integracao-mensageria.test.mjs",
     "build": "next build",
     "start": "next start",
-    "test": "node --experimental-strip-types --test tests/domain.test.mjs tests/catalog.test.mjs",
+    "test": "node --experimental-strip-types --test tests/domain.test.mjs tests/catalog.test.mjs tests/csv-import.test.mjs",
     "lint": "oxlint",
     "format": "oxfmt"
   },

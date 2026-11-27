@@ -1,4 +1,14 @@
-import { applyAction, emptyState, hydrateState } from '@/lib/domain';
+import {
+  applyAction,
+  emptyState,
+  hydrateState,
+  applyCsvImport,
+  planCsvImport,
+  type CsvImportSummary,
+  type State
+} from '@/lib/domain';
+
+import { parseProductCsv } from '@/lib/csv-import';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,12 +96,79 @@ export async function POST(request: Request) {
     const row = await readStore(user.id, token);
     if (body.revision !== Number(row.revision)) return json({ error: 'Seus dados foram atualizados enquanto você editava (em outra aba ou por um pedido do catálogo). A versão mais recente já foi carregada: confira e salve de novo.' }, 409);
 
-    if (body.action === 'product') {
-      const existing = typeof body.id === 'string' ? row.state.products.find((product) => product.id === body.id) : null;
-      body.code = existing?.code || await nextSku(token);
+    let state: State;
+    let importSummary: CsvImportSummary | undefined;
+
+    if (body.action === 'import-products-csv') {
+      if (typeof body.csv !== 'string') {
+        return json({
+          error: 'Informe um arquivo CSV.'
+        }, 400);
+      }
+
+      const preview = parseProductCsv(body.csv);
+
+      if (preview.errors.length) {
+        const first = preview.errors[0];
+
+        return json({
+          error: 'Linha ' + first.line + ': ' + first.message,
+          errors: preview.errors
+        }, 400);
+      }
+
+      const plan = planCsvImport(
+        row.state,
+        preview.products
+      );
+
+      if (plan.newProducts.length > 50) {
+        return json({
+          error: 'Importe no máximo 50 novos produtos por vez.'
+        }, 400);
+      }
+
+      if (!plan.newProducts.length) {
+        return json({
+          state: row.state,
+          revision: Number(row.revision),
+          importSummary: {
+            imported: [],
+            skipped: plan.skipped
+          }
+        });
+      }
+
+      const codes: string[] = [];
+
+      for (let i = 0; i < plan.newProducts.length; i++) {
+        codes.push(await nextSku(token));
+      }
+
+      const result = applyCsvImport(
+        row.state,
+        preview.products,
+        codes
+      );
+
+      state = result.state;
+      importSummary = result.summary;
+    } else {
+      if (body.action === 'product') {
+        const existing =
+          typeof body.id === 'string'
+            ? row.state.products.find(
+                product => product.id === body.id
+              )
+            : null;
+
+        body.code =
+          existing?.code || await nextSku(token);
+      }
+
+      state = applyAction(row.state, body);
     }
 
-    const state = applyAction(row.state, body);
     const path = `/rest/v1/trama_store_state?user_id=eq.${encodeURIComponent(user.id)}&revision=eq.${row.revision}&select=state,revision`;
     const response = await supabaseFetch(path, token, {
       method: 'PATCH',
@@ -101,7 +178,11 @@ export async function POST(request: Request) {
     if (!response.ok) throw new Error('Não foi possível salvar no Supabase.');
     const rows = (await response.json()) as Pick<StoreRow, 'state' | 'revision'>[];
     if (!rows[0]) return json({ error: 'Seus dados foram atualizados enquanto você editava (em outra aba ou por um pedido do catálogo). A versão mais recente já foi carregada: confira e salve de novo.' }, 409);
-    return json({ state: rows[0].state, revision: Number(rows[0].revision) });
+    return json({
+      state: rows[0].state,
+      revision: Number(rows[0].revision),
+      ...(importSummary ? { importSummary } : {})
+    });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : 'Não foi possível salvar.' }, 400);
   }

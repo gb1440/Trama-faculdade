@@ -1,3 +1,5 @@
+import type { CsvProduct } from './csv-import';
+
 export type Variant={id:string;color:string;size:string;stock:number};
 export type Product={id:string;name:string;code:string;category:string;photo:string;cost:number;retail:number;wholesale:number;minimum:number;orderMinimum?:number;catalogVisible?:boolean;variants:Variant[]};
 export type Customer={id:string;name:string;phone:string;city:string;type:string;notes:string;followup:string};
@@ -12,7 +14,7 @@ export type PurchaseItem={productId:string;variantId:string;name:string;variant:
 export type Purchase={id:string;number:number;supplierId:string;supplier:string;status:'Pedido'|'Recebida'|'Cancelada';date:string;due:string;method:string;items:PurchaseItem[];total:number;entryId:string};
 export type CashSession={id:string;date:string;openedAt:string;closedAt:string;openingAmount:number;countedAmount:number;expectedAmount:number;difference:number;status:'Aberto'|'Fechado';notes:string;receiptStart?:number};
 export type MonthlyReport={month:string;revenue:number;cost:number;grossProfit:number;received:number;paidOut:number;realized:number;pieces:number;ticket:number;stockValue:number;products:{name:string;qty:number;total:number}[];methods:{method:string;in:number;out:number}[];salesCount:number};
-export type State={settings:{name:string;minQty:number;minValue:number};products:Product[];customers:Customer[];sales:Sale[];entries:Entry[];movements:Movement[];receipts:Receipt[];returns:ReturnRecord[];suppliers:Supplier[];purchases:Purchase[];cashSessions:CashSession[]};
+export type State={csvImportLinks?:CsvImportLink[];settings:{name:string;minQty:number;minValue:number};products:Product[];customers:Customer[];sales:Sale[];entries:Entry[];movements:Movement[];receipts:Receipt[];returns:ReturnRecord[];suppliers:Supplier[];purchases:Purchase[];cashSessions:CashSession[]};
 export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Fortaleza',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 export const emptyState=():State=>({settings:{name:'Minha loja',minQty:0,minValue:0},products:[],customers:[],sales:[],entries:[],movements:[],receipts:[],returns:[],suppliers:[],purchases:[],cashSessions:[]});
 export function hydrateState(value:State):State{const base=emptyState();return{...base,...value,settings:{...base.settings,...value?.settings},products:value?.products||[],customers:value?.customers||[],sales:value?.sales||[],entries:value?.entries||[],movements:value?.movements||[],receipts:value?.receipts||[],returns:value?.returns||[],suppliers:value?.suppliers||[],purchases:value?.purchases||[],cashSessions:value?.cashSessions||[]}}
@@ -69,4 +71,110 @@ export function applyAction(source:State,raw:unknown):State{
  case 'cash-close':{const session=s.cashSessions.find(x=>x.id===a.id&&x.status==='Aberto');if(!session)fail('Não há caixa aberto para fechar.');const counted=num(a.countedAmount),expected=cashExpected(s,session.date,session.openingAmount,session.receiptStart||0);session.countedAmount=counted;session.expectedAmount=expected;session.difference=counted-expected;session.closedAt=new Date().toISOString();session.notes=str(a.notes,1000)||session.notes;session.status='Fechado';break}
  default:fail('Operação desconhecida.')
  }return s;
+}
+
+
+// A carga inicial conserva o vínculo mesmo se um cadastro for excluído.
+export type CsvImportLink = {
+  externalCode: string;
+  productId: string;
+  productCode: string;
+  variants: {
+    variantId: string;
+    color: string;
+    size: string;
+  }[];
+};
+
+export type CsvImportSummary = {
+  imported: CsvImportLink[];
+  skipped: string[];
+};
+
+export function planCsvImport(
+  source: State,
+  products: CsvProduct[]
+) {
+  const known = new Set(
+    (source.csvImportLinks ?? []).map(
+      link => link.externalCode.toUpperCase()
+    )
+  );
+
+  const newProducts: CsvProduct[] = [];
+  const skipped: string[] = [];
+
+  for (const product of products) {
+    const key = product.externalCode.toUpperCase();
+
+    if (known.has(key)) {
+      skipped.push(product.externalCode);
+    } else {
+      known.add(key);
+      newProducts.push(product);
+    }
+  }
+
+  return { newProducts, skipped };
+}
+
+export function applyCsvImport(
+  source: State,
+  products: CsvProduct[],
+  codes: string[]
+): {
+  state: State;
+  summary: CsvImportSummary;
+} {
+  const { newProducts, skipped } =
+    planCsvImport(source, products);
+
+  if (codes.length !== newProducts.length) {
+    fail('Quantidade de códigos internos inválida.');
+  }
+
+  let state = structuredClone(hydrateState(source));
+  const imported: CsvImportLink[] = [];
+
+  for (const [index, product] of newProducts.entries()) {
+    state = applyAction(state, {
+      action: 'product',
+      code: codes[index],
+      name: product.name,
+      category: 'Importados',
+      photo: '',
+      cost: 0,
+      retail: product.price,
+      wholesale: product.price,
+      minimum: 0,
+      orderMinimum: 0,
+      catalogVisible: true,
+      variants: product.variants
+    });
+
+    const created = state.products[0];
+
+    imported.push({
+      externalCode: product.externalCode,
+      productId: created.id,
+      productCode: created.code,
+      variants: created.variants.map(variant => ({
+        variantId: variant.id,
+        color: variant.color,
+        size: variant.size
+      }))
+    });
+  }
+
+  if (imported.length) {
+    state.csvImportLinks = [
+      ...(state.csvImportLinks ?? []),
+      ...imported
+    ];
+  }
+
+  return {
+    state,
+    summary: { imported, skipped }
+  };
 }
